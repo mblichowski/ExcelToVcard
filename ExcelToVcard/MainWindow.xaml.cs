@@ -1,6 +1,7 @@
 ﻿using ExcelDataReader;
 using Microsoft.Win32;
 using System;
+using System.Configuration;
 using System.Data;
 using System.IO;
 using System.Linq;
@@ -19,17 +20,19 @@ namespace ExcelToVcard;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private const string SubDirectory = "identified vCards";
-
-    //BaseLuminanceSource
+    private const string _subDirectory = "identified vCards";
+    private const int _qrCodeImagePixelHeightDefault = 6000;
+    private readonly int? _qrCodeImagePixelHeight;
 
     private readonly BarcodeReader _reader = new BarcodeReader();
 
-    //private static readonly Func<BitmapSource, LuminanceSource> defaultCreateLuminanceSource =
-    //	   bitmap => new BitmapSourceLuminanceSource(bitmap);
-
     public MainWindow()
     {
+        _qrCodeImagePixelHeight =
+            int.TryParse(ConfigurationManager.AppSettings["QrCodeImagePixelHeight"], out int pixelHeight) ?
+            pixelHeight :
+            _qrCodeImagePixelHeightDefault;
+
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         InitializeComponent();
     }
@@ -96,7 +99,7 @@ public partial class MainWindow : Window
 
     private async void BtnIdentifyFiles_Click(object sender, RoutedEventArgs e)
     {
-        string GetDestinationDirectory(string rootPath) => Path.Combine(rootPath, SubDirectory);
+        string GetDestinationDirectory(string rootPath) => Path.Combine(rootPath, _subDirectory);
 
         try
         {
@@ -130,12 +133,12 @@ public partial class MainWindow : Window
         void IdentifyvCardsAsync(System.Windows.Forms.FolderBrowserDialog dialog)
         {
             Directory.CreateDirectory(GetDestinationDirectory(dialog.SelectedPath));
-            foreach (var filename in Directory.GetFiles(dialog.SelectedPath, "*.jpg"))
+            foreach (var filename in Directory.GetFiles(dialog.SelectedPath, "*.jpg").OrderBy(_ => _))
             {
                 BitmapImage bi = new();
                 bi.BeginInit();
                 bi.UriSource = new Uri(filename);
-                bi.DecodePixelHeight = 5000;
+                bi.DecodePixelHeight = _qrCodeImagePixelHeight ?? _qrCodeImagePixelHeightDefault;
                 bi.EndInit();
 
                 var qrCodeContent = _reader.Decode(bi);
