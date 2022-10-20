@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ExcelToVcard"
         mc:Ignorable="d"
-        Title="MainWindow" Height="261" Width="369">
+        Title="Programik &lt;3" Height="261" Width="369">
     <DockPanel Margin="10">
         <StackPanel HorizontalAlignment="Center" DockPanel.Dock="Top" Margin="0,0,0,10">
             <Button x:Name="btnOpenFile" Click="BtnOpenFile_Click" Height="70" Width="244" Margin="10" Content="Open Excel file"/>
