@@ -12,6 +12,16 @@
 	<PackageReference Include="ExcelDataReader.DataSet" Version="3.6.0" />
 	<PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
 	<PackageReference Include="System.Text.Encoding.CodePages" Version="6.0.0" />
+	<PackageReference Include="vCardLib.dll" Version="4.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="zxing">
+      <HintPath>..\..\ZXing.Net\Build\Debug\Clients\WPFDemo\zxing.dll</HintPath>
+    </Reference>
+    <Reference Include="zxing.presentation">
+      <HintPath>..\..\ZXing.Net\Build\Debug\Clients\WPFDemo\zxing.presentation.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>

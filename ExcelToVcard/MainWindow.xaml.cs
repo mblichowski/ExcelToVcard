@@ -5,8 +5,12 @@ using System.Data;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
+using vCardLib.Deserializers;
+using BarcodeReader = ZXing.Presentation.BarcodeReader;
 
 namespace ExcelToVcard;
 
@@ -15,13 +19,22 @@ namespace ExcelToVcard;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private const string SubDirectory = "identified vCards";
+
+    //BaseLuminanceSource
+
+    private readonly BarcodeReader _reader = new BarcodeReader();
+
+    //private static readonly Func<BitmapSource, LuminanceSource> defaultCreateLuminanceSource =
+    //	   bitmap => new BitmapSourceLuminanceSource(bitmap);
+
     public MainWindow()
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         InitializeComponent();
     }
 
-    private void BtnOpenFile_Click(object sender, RoutedEventArgs e)
+    private async void BtnOpenFile_Click(object sender, RoutedEventArgs e)
     {
         try
         {
@@ -30,10 +43,29 @@ public partial class MainWindow : Window
                 return;
 
             this.Cursor = Cursors.Wait;
+            this.progressBar.Visibility = Visibility.Visible;
 
-            using var stream = File.Open(openFileDialog.FileName, FileMode.Open, FileAccess.Read);
-            using var reader = ExcelReaderFactory.CreateReader(stream, new ExcelReaderConfiguration() { FallbackEncoding = Encoding.GetEncoding(1252) });
+            await Task.Run(() => CreateVCardTemplateFilesAsync(openFileDialog));
 
+            MessageBox.Show("Export completed", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            this.Cursor = Cursors.Arrow;
+            this.progressBar.Visibility = Visibility.Hidden;
+        }
+
+        static void CreateVCardTemplateFilesAsync(OpenFileDialog openFileDialog)
+        {
+            FileStream stream;
+            IExcelDataReader reader;
+
+            stream = File.Open(openFileDialog.FileName, FileMode.Open, FileAccess.Read);
+            reader = ExcelReaderFactory.CreateReader(stream, new ExcelReaderConfiguration() { FallbackEncoding = Encoding.GetEncoding(1252) });
             var result = reader.AsDataSet(new ExcelDataSetConfiguration
             {
                 ConfigureDataTable = tableReader => new ExcelDataTableConfiguration
@@ -59,34 +91,62 @@ public partial class MainWindow : Window
                 File.WriteAllText(path, "#QRCodes\n", System.Text.Encoding.Unicode);
                 File.AppendAllLines(path, vcards, System.Text.Encoding.Unicode);
             }
-
-            MessageBox.Show("Export completed", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-        catch (System.Exception ex)
+    }
+
+    private async void BtnIdentifyFiles_Click(object sender, RoutedEventArgs e)
+    {
+        string GetDestinationDirectory(string rootPath) => Path.Combine(rootPath, SubDirectory);
+
+        try
+        {
+            using var dialog = new System.Windows.Forms.FolderBrowserDialog
+            {
+                Description = "Choose folder to scan for vCard files",
+                UseDescriptionForTitle = true,
+                SelectedPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory) + Path.DirectorySeparatorChar,
+            };
+
+            if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                return;
+
+            this.Cursor = Cursors.Wait;
+            this.progressBar.Visibility = Visibility.Visible;
+
+            await Task.Run(() => IdentifyvCardsAsync(dialog));
+
+            MessageBox.Show($"vCards identification completed.\n\nNew files written in: {GetDestinationDirectory(dialog.SelectedPath)}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
         {
             MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
             this.Cursor = Cursors.Arrow;
+            this.progressBar.Visibility = Visibility.Hidden;
+        }
+
+        void IdentifyvCardsAsync(System.Windows.Forms.FolderBrowserDialog dialog)
+        {
+            Directory.CreateDirectory(GetDestinationDirectory(dialog.SelectedPath));
+            foreach (var filename in Directory.GetFiles(dialog.SelectedPath, "*.jpg"))
+            {
+                BitmapImage bi = new();
+                bi.BeginInit();
+                bi.UriSource = new Uri(filename);
+                bi.DecodePixelHeight = 5000;
+                bi.EndInit();
+
+                var qrCodeContent = _reader.Decode(bi);
+                var vCard = Deserializer.FromString(qrCodeContent.Text).Single();
+
+                var src = Path.Combine(dialog.SelectedPath, filename);
+                var dest = Path.ChangeExtension(Path.Combine(GetDestinationDirectory(dialog.SelectedPath), vCard.CustomFields.Single(_ => _.Key.Contains("FN")).Value), Path.GetExtension(filename));
+
+                File.Copy(src, dest, overwrite: true);
+            }
         }
     }
 
-    private void BtnIdentifyFiles_Click(object sender, RoutedEventArgs e)
-    {
-        using var dialog = new System.Windows.Forms.FolderBrowserDialog
-        {
-            Description = "Choose folder to scan for vCard files",
-            UseDescriptionForTitle = true,
-            SelectedPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory) + Path.DirectorySeparatorChar,
-        };
-
-        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-            return;
-
-        foreach (var filename in Directory.GetFiles(dialog.SelectedPath, "*.jpg"))
-        {
-
-        }
-    }
 }
