@@ -10,34 +10,6 @@ using System.Windows.Input;
 
 namespace ExcelToVcard;
 
-public static class StringExtensions
-{
-    public static string FixChars(this object o) => o
-        .ToString()?
-        .Replace(",", " ")
-        .Replace(Environment.NewLine, " ")
-        .Replace("\n", " ")
-        .Trim() ?? String.Empty;
-
-    public static string FixUrl(this string s)
-    {
-        if (s.EndsWith("/"))
-            s = s[..^1];
-
-        return s
-            .Replace("http://", "")
-            .Replace("https://", "");
-    }
-
-    public static string CheckPhone(this string s)
-    {
-        return
-            s.StartsWith("+") ?
-            s :
-            "+" + s;
-    }
-}
-
 /// <summary>
 /// Interaction logic for MainWindow.xaml
 /// </summary>
@@ -54,7 +26,7 @@ public partial class MainWindow : Window
         try
         {
             OpenFileDialog openFileDialog = new() { Filter = "Excel files (*.xlsx)|*.xlsx" };
-            if (openFileDialog.ShowDialog() == false)
+            if (openFileDialog.ShowDialog(this) == false)
                 return;
 
             this.Cursor = Cursors.Wait;
@@ -102,6 +74,19 @@ public partial class MainWindow : Window
 
     private void BtnIdentifyFiles_Click(object sender, RoutedEventArgs e)
     {
+        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "Choose folder to scan for vCard files",
+            UseDescriptionForTitle = true,
+            SelectedPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory) + Path.DirectorySeparatorChar,
+        };
 
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+            return;
+
+        foreach (var filename in Directory.GetFiles(dialog.SelectedPath, "*.jpg"))
+        {
+
+        }
     }
 }
