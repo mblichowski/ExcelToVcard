@@ -84,7 +84,7 @@ public partial class MainWindow : Window
                 var vcards =
                     table
                     .Where(row => !String.IsNullOrEmpty(row["NAME"].ToString()))
-                    .Select(row => $@"BEGIN:VCARD\nVERSION:3.0\nN;CHARSET=UTF-8:{row["SURNAME"].FixChars()};{row["NAME"].FixChars()}\nFN;CHARSET=UTF-8:{row["NAME"].FixChars()} {row["SURNAME"].FixChars()}\nORG:{row["COMPANY"].FixChars()}\nTITLE:{row["JOB TITLE"].FixChars()}\nTEL;CELL:{row["PHONE NUMBER"].FixChars().CheckPhone()}\nADR;WORK:;;{row["STREET"].FixChars()};{row["City"].FixChars()};{row["POSTCODE"].FixChars()};{row["COUNTRY"].FixChars()}\nURL:{row["WWW"].FixChars().FixUrl()}\nEMAIL;WORK;INTERNET:{row["E-MAIL"].FixChars()}\nnEND:VCARD")
+                    .Select(row => $@"BEGIN:VCARD\nVERSION:3.0\nN;CHARSET=UTF-8:{row["SURNAME"].FixChars()};{row["NAME"].FixChars()}\nFN;CHARSET=UTF-8:{row["NAME"].FixChars()} {row["SURNAME"].FixChars()}\nORG:{row["COMPANY"].FixChars()}\nTITLE:{row["JOB TITLE"].FixChars()}\nTEL;CELL:{row["PHONE NUMBER"].FixChars().CheckPhone()}\nADR;WORK:;;{row["STREET"].FixChars()};{row["City"].FixChars()};{row["POSTCODE"].FixChars()};{row["COUNTRY"].FixChars()}\nURL:{row["WWW"].FixChars().FixUrl()}\nEMAIL;WORK;INTERNET:{row["E-MAIL"].FixChars()}\nEND:VCARD")
                     .ToList();
 
                 var path = Path.Combine(
