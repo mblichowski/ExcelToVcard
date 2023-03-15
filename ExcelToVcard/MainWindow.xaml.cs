@@ -1,6 +1,7 @@
 ﻿using ExcelDataReader;
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
 using System.IO;
@@ -77,22 +78,25 @@ public partial class MainWindow : Window
                 }
             });
 
-            foreach (var name in new[] { "STAND SUPPORT", "VISITORS" })
-            {
-                var table = result.Tables[name]?.AsEnumerable() ?? throw new System.Exception($"Table {name} not found");
+            var sheets = result.Tables.OfType<DataTable>();
+            if (!sheets.Any())
+                throw new Exception($"No sheets found in the given Excel workbook.");
 
+            foreach (var sheet in sheets)
+            {
                 var vcards =
-                    table
+                    sheet
+                    .AsEnumerable()
                     .Where(row => !String.IsNullOrEmpty(row["NAME"].ToString()))
                     .Select(row => $@"BEGIN:VCARD\nVERSION:3.0\nN;CHARSET=UTF-8:{row["SURNAME"].FixChars()};{row["NAME"].FixChars()}\nFN;CHARSET=UTF-8:{row["NAME"].FixChars()} {row["SURNAME"].FixChars()}\nORG:{row["COMPANY"].FixChars()}\nTITLE:{row["JOB TITLE"].FixChars()}\nTEL;CELL:{row["PHONE NUMBER"].FixChars().CheckPhone()}\nADR;WORK:;;{row["STREET"].FixChars()};{row["City"].FixChars()};{row["POSTCODE"].FixChars()};{row["COUNTRY"].FixChars()}\nURL:{row["WWW"].FixChars().FixUrl()}\nEMAIL;WORK;INTERNET:{row["E-MAIL"].FixChars()}\nEND:VCARD")
                     .ToList();
 
                 var path = Path.Combine(
                         Path.GetDirectoryName(openFileDialog.FileName) ?? throw new Exception("Directory not found"),
-                        Path.GetFileNameWithoutExtension(openFileDialog.FileName) + "_" + name.ToLower() + ".txt");
+                        Path.GetFileNameWithoutExtension(openFileDialog.FileName) + "_" + sheet.TableName.ToLower() + ".txt");
 
-                File.WriteAllText(path, "#QRCodes\n", System.Text.Encoding.Unicode);
-                File.AppendAllLines(path, vcards, System.Text.Encoding.Unicode);
+                File.WriteAllText(path, "#QRCodes\n", Encoding.Unicode);
+                File.AppendAllLines(path, vcards, Encoding.Unicode);
             }
         }
     }
@@ -116,9 +120,12 @@ public partial class MainWindow : Window
             this.Cursor = Cursors.Wait;
             this.progressBar.Visibility = Visibility.Visible;
 
-            await Task.Run(() => IdentifyvCardsAsync(dialog));
+            var b = chkAddSuffix.IsChecked ?? false;
+            var failedFiles = await Task.Run(() => IdentifyvCards(dialog, b));
+            if (failedFiles.Any())
+                File.WriteAllLines(Path.Combine(GetDestinationDirectory(dialog.SelectedPath), "failed files.txt"), failedFiles);
 
-            MessageBox.Show($"vCards identification completed.\n\nNew files written in: {GetDestinationDirectory(dialog.SelectedPath)}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show($"vCards identification completed.\n\nNew files written in: {GetDestinationDirectory(dialog.SelectedPath)}{(failedFiles.Any() ? "\n\nNot recognized files list written in the same directory." : "")}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
@@ -130,8 +137,10 @@ public partial class MainWindow : Window
             this.progressBar.Visibility = Visibility.Hidden;
         }
 
-        void IdentifyvCardsAsync(System.Windows.Forms.FolderBrowserDialog dialog)
+        IEnumerable<string> IdentifyvCards(System.Windows.Forms.FolderBrowserDialog dialog, bool useDifferentDestNameTemplate)
         {
+            List<string> failedFiles = new();
+
             Directory.CreateDirectory(GetDestinationDirectory(dialog.SelectedPath));
             foreach (var filename in Directory.GetFiles(dialog.SelectedPath, "*.jpg").OrderBy(_ => _))
             {
@@ -142,13 +151,28 @@ public partial class MainWindow : Window
                 bi.EndInit();
 
                 var qrCodeContent = _reader.Decode(bi);
+
+                if (qrCodeContent is null)
+                {
+                    failedFiles.Add(filename);
+                    continue;
+                }
+
                 var vCard = Deserializer.FromString(qrCodeContent.Text).Single();
 
                 var src = Path.Combine(dialog.SelectedPath, filename);
-                var dest = Path.ChangeExtension(Path.Combine(GetDestinationDirectory(dialog.SelectedPath), vCard.CustomFields.Single(_ => _.Key.Contains("FN")).Value), Path.GetExtension(filename));
+                var dest = Path.ChangeExtension(
+                    path: Path.Combine(
+                        GetDestinationDirectory(dialog.SelectedPath),
+                        useDifferentDestNameTemplate ?
+                        String.Join('_', vCard.CustomFields.Single(_ => !_.Key.Contains("FN")).Value.Trim().Split(";").Reverse()) + "_vCard" :
+                        vCard.CustomFields.Single(_ => _.Key.Contains("FN")).Value),
+                    extension: Path.GetExtension(filename));
 
                 File.Copy(src, dest, overwrite: true);
             }
+
+            return failedFiles;
         }
     }
 
